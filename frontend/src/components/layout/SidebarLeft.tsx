@@ -1,4 +1,4 @@
-import { Search, Filter, List } from 'lucide-react';
+import { Search, List } from 'lucide-react';
 import { ThreatCard } from './ThreatCard';
 import { useMemo } from 'react';
 
