@@ -17,19 +17,20 @@ from app.algorithms.temporal_dsa import detect_smurfing
 load_dotenv()
 
 app = FastAPI(title="Money Mule Detection Engine")
-origins = [
-    "http://localhost:3000",
-    "https://money-mule-engine.vercel.app/",
-    "https://*.vercel.app",   # preview deployments
-]
+
 # Enable CORS for Frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://money-mule-engine.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Initialize Groq Client
 groq_client = None
