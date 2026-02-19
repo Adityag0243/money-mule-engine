@@ -1,4 +1,4 @@
-import { X, Clock, ArrowRight, DollarSign, Calendar } from 'lucide-react';
+import { X, Clock, ArrowRight, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo } from 'react';
 
