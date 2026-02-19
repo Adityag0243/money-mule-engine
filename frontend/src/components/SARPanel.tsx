@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Fingerprint } from 'lucide-react';
+import { X, Send, Sparkles } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { ToastType } from './ui/Toast';
 
