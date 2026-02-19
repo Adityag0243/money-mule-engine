@@ -125,8 +125,15 @@ export function SARPanel({ isOpen, onClose, ringData }: SARPanelProps) {
                            </div>
                            <div>
                               <div className="text-xs text-slate-400 mb-1">Likely Mule Herder / Controller</div>
-                              <div className="text-lg font-mono font-bold text-white">{report.mule_herder}</div>
-                              <div className="text-[10px] text-red-400 uppercase tracking-wider font-bold">Highest Degree Centrality Detected</div>
+                              <div className="text-lg font-mono font-bold text-white">
+                                  {typeof report.mule_herder === 'object' ? report.mule_herder.account_id : report.mule_herder}
+                              </div>
+                              {typeof report.mule_herder === 'object' && report.mule_herder.reason && (
+                                  <div className="text-[10px] text-slate-400 mt-1 max-w-xs leading-tight">
+                                      {report.mule_herder.reason}
+                                  </div>
+                              )}
+                              <div className="text-[10px] text-red-400 uppercase tracking-wider font-bold mt-1">Highest Degree Centrality Detected</div>
                            </div>
                         </div>
                      </section>

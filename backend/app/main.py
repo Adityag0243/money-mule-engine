@@ -88,15 +88,30 @@ async def analyze_transactions(file: UploadFile = File(...)):
     }
     
     formatted_rings = []
+    seen_ring_ids = set()
 
     for ring in rings:
         rtype = ring["type"]
         weight = WEIGHTS.get(rtype, 10)
-        ring_id = f"RING-{abs(hash(str(ring['members']) + rtype)) % 10000:04d}"
+        
+        # Improved Ring ID generation to reduce conflicts and collisions
+        # Sort members to ensure deterministic ID regardless of order
+        sorted_members = sorted([str(m) for m in ring['members']])
+        members_str = ",".join(sorted_members)
+        
+        # Use a larger hash range
+        ring_hash = abs(hash(members_str + rtype)) % 100000
+        ring_id = f"RING-{ring_hash:05d}"
+        
+        # Deduplication: If this ring ID has been seen, skip it (or handle collision)
+        # For this logic, we assume same ID = same ring pattern, so we skip duplicates
+        if ring_id in seen_ring_ids:
+            continue
+        seen_ring_ids.add(ring_id)
         
         ring_risk_score = min(100, weight + (len(ring['members']) * 2))
         
-        ring_members_set = set(str(m) for m in ring["members"])
+        ring_members_set = set(sorted_members)
         ring_val = 0
         try:
             v_indices = [graph.vs.find(name=str(m)).index for m in ring_members_set if str(m) in all_accounts]
@@ -108,14 +123,13 @@ async def analyze_transactions(file: UploadFile = File(...)):
             
         formatted_rings.append({
             "ring_id": ring_id,
-            "member_accounts": [str(m) for m in ring["members"]],
+            "member_accounts": sorted_members,
             "pattern_type": rtype,
             "risk_score": ring_risk_score,
             "total_value": round(ring_val, 2)
         })
         
-        for member in ring["members"]:
-            member = str(member)
+        for member in sorted_members:
             if member not in suspicious_accounts:
                 suspicious_accounts[member] = {
                     "account_id": member,
@@ -239,7 +253,7 @@ async def generate_sar(ring: Dict[str, Any] = Body(...)):
                     "content": prompt
                 }
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             temperature=0.2,
             max_tokens=300,
             response_format={"type": "json_object"}
