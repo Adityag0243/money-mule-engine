@@ -36,7 +36,8 @@ export function SARPanel({ isOpen, onClose, ringData, showToast }: SARPanelProps
           setLoading(false);
       })
       .catch(err => {
-          setError("AI Synthesis Failed. Check connection.", err);
+          console.error(err);
+          setError("AI Synthesis Failed. Check connection.", "error");
           setLoading(false);
       });
     }
@@ -61,7 +62,8 @@ export function SARPanel({ isOpen, onClose, ringData, showToast }: SARPanelProps
               throw new Error("Submission failed");
           }
       } catch (err) {
-          showToast("Failed to submit SAR.", err);
+          console.error(err);
+          showToast("Failed to submit SAR.",);
           setLoading(false);
       }
   };
