@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, memo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { ZoomIn, ZoomOut, Maximize, DollarSign } from 'lucide-react';
 import clsx from 'clsx';
@@ -12,26 +12,27 @@ interface GraphVisualizerProps {
   onNodeClick: (node: any) => void;
 }
 
-const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisualizerProps) => {
+const GraphVisualizer = memo(({ graphData, isolatedRingId, onNodeClick }: GraphVisualizerProps) => {
   const fgRef = useRef<any>();
   const [dimensions, setDimensions] = useState({ w: 800, h: 600 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [showAmounts, setShowAmounts] = useState(false);
 
-  // Filter Data based on Isolation
-  const displayData = (() => {
+  // Filter Data based on Isolation - MEMOIZED to prevent expensive re-calculation
+  const displayData = useMemo(() => {
       if (!isolatedRingId) return graphData;
       
       const relevantNodes = graphData.nodes.filter((n: any) => n.ring && n.ring.includes(isolatedRingId));
       const relevantNodeIds = new Set(relevantNodes.map((n: any) => n.id));
       
+      // Also include neighbors? For now, strict isolation as requested
       const relevantLinks = graphData.links.filter((l: any) => 
           relevantNodeIds.has(typeof l.source === 'object' ? l.source.id : l.source) && 
           relevantNodeIds.has(typeof l.target === 'object' ? l.target.id : l.target)
       );
 
       return { nodes: relevantNodes, links: relevantLinks };
-  })();
+  }, [graphData, isolatedRingId]);
 
   useEffect(() => {
     const updateDims = () => {
@@ -55,7 +56,7 @@ const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisual
              fgRef.current.zoomToFit(800, 50);
          }, 200);
      }
-  }, [isolatedRingId, displayData]);
+  }, [isolatedRingId]); // Removed displayData dependency to avoid loop if object ref changes
 
 
   const handleZoom = (k: number) => {
@@ -83,7 +84,7 @@ const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisual
             </button>
             <div className="w-full h-px bg-white/10 my-1"></div>
             <button 
-                onClick={() => setShowAmounts(!showAmounts)} 
+                onClick={() => setShowAmounts(prev => !prev)} 
                 className={clsx(
                     "p-2 rounded transition-colors",
                     showAmounts ? "bg-green-500/20 text-green-400" : "hover:bg-white/10 text-slate-500"
@@ -192,6 +193,6 @@ const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisual
 
     </div>
   );
-};
+});
 
 export default GraphVisualizer;

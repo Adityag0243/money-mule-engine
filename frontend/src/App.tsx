@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Upload, FileText, Search, Activity, AlertTriangle } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { Header } from './components/layout/Header';
 import { SidebarLeft } from './components/layout/SidebarLeft';
 import { SidebarRight } from './components/layout/SidebarRight';
 import { SARPanel } from './components/SARPanel';
 import GraphVisualizer from './components/GraphVisualizer';
+import { Toast, useToast } from './components/ui/Toast';
 
 // Types (Keep existing)
 interface SuspiciousAccount {
@@ -44,6 +46,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast, showToast, hideToast } = useToast();
   
   // View State
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
@@ -178,7 +181,7 @@ function App() {
              totalTransactions: data.summary.total_accounts_analyzed,
              processingTime: data.summary.processing_time_seconds,
              fraudRings: data.summary.fraud_rings_detected,
-             illicitVolume: 0 // Could sum up ring values if needed
+             illicitVolume: 0 
          }}
          onExport={downloadJson}
       />
@@ -206,6 +209,7 @@ function App() {
           <SidebarRight 
               node={selectedNode} 
               onClose={() => setSelectedNode(null)} 
+              showToast={showToast}
           />
 
           {/* 5. SAR Panel (Overlay) */}
@@ -213,7 +217,19 @@ function App() {
              isOpen={!!sarRing}
              onClose={() => setSarRing(null)}
              ringData={sarRing}
+             showToast={showToast}
           />
+
+          {/* Toast Notification Layer */}
+          <AnimatePresence>
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={hideToast} 
+                />
+            )}
+          </AnimatePresence>
           
       </div>
     </div>
