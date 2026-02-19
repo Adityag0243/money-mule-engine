@@ -5,9 +5,10 @@ interface SidebarLeftProps {
   rings: any[];
   selectedRingId: string | null;
   onSelectRing: (id: string | null) => void;
+  onGenerateSAR: (ring: any) => void;
 }
 
-export function SidebarLeft({ rings, selectedRingId, onSelectRing }: SidebarLeftProps) {
+export function SidebarLeft({ rings, selectedRingId, onSelectRing, onGenerateSAR }: SidebarLeftProps) {
   return (
     <aside className="w-[350px] border-r border-white/10 bg-[#020205]/50 flex flex-col h-[calc(100vh-64px)]">
       
@@ -37,6 +38,7 @@ export function SidebarLeft({ rings, selectedRingId, onSelectRing }: SidebarLeft
                    ring={ring} 
                    isSelected={selectedRingId === ring.ring_id} 
                    onSelect={onSelectRing}
+                   onGenerateSAR={onGenerateSAR}
                 />
              ))
          )}

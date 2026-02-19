@@ -1,12 +1,19 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 import pandas as pd
 import igraph
 import io
 import time
+import os
 from typing import Dict, List, Any
+from dotenv import load_dotenv
+from groq import Groq
 from app.algorithms.graph_dsa import find_cycles_dfs, detect_shells
 from app.algorithms.temporal_dsa import detect_smurfing
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Money Mule Detection Engine")
 
@@ -18,6 +25,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize Groq Client
+groq_client = None
+api_key = os.getenv("GROQ_API_KEY")
+if api_key and "gsk_" in api_key:
+    try:
+        groq_client = Groq(api_key=api_key)
+        print("Groq Client Initialized Successfully")
+    except Exception as e:
+        print(f"Failed to initialize Groq client: {e}")
+else:
+    print("WARNING: GROQ_API_KEY not found or invalid in .env. AI features will be disabled or mocked.")
 
 @app.post("/analyze")
 async def analyze_transactions(file: UploadFile = File(...)):
@@ -37,24 +56,26 @@ async def analyze_transactions(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid CSV: {str(e)}")
 
+    # 1b. Pre-calculate Account Stats
+    inflow = df.groupby('receiver_id')['amount'].sum().to_dict()
+    outflow = df.groupby('sender_id')['amount'].sum().to_dict()
+
     # 2. Graph Construction
-    edges = list(zip(df['sender_id'].astype(str), df['receiver_id'].astype(str)))
-    graph = igraph.Graph.TupleList(edges, directed=True)
+    edges = list(zip(df['sender_id'].astype(str), df['receiver_id'].astype(str), df['amount']))
+    graph = igraph.Graph.TupleList(edges, directed=True, edge_attrs="amount")
     all_accounts = graph.vs["name"]
     
     # 3. Execution (Sequential)
     rings = []
-    suspicious_accounts = {} # map id -> dict
+    suspicious_accounts = {} 
     
-    # Algorithm 1: Cycles
+    # Algorithms
     cycles = find_cycles_dfs(graph, min_len=3, max_len=5)
     rings.extend(cycles)
     
-    # Algorithm 2: Smurfing
     smurfs = detect_smurfing(df, window_hours=72, count_threshold=10)
     rings.extend(smurfs)
     
-    # Algorithm 3: Shells
     shells = detect_shells(graph, min_hops=3)
     rings.extend(shells)
     
@@ -71,19 +92,26 @@ async def analyze_transactions(file: UploadFile = File(...)):
     for ring in rings:
         rtype = ring["type"]
         weight = WEIGHTS.get(rtype, 10)
-        
-        # Ring ID
         ring_id = f"RING-{abs(hash(str(ring['members']) + rtype)) % 10000:04d}"
         
-        # Calculate Ring Risk Score (Max of implied weight or specific logic)
-        # For simple logic, we assign the base weight + bonus for size
         ring_risk_score = min(100, weight + (len(ring['members']) * 2))
         
+        ring_members_set = set(str(m) for m in ring["members"])
+        ring_val = 0
+        try:
+            v_indices = [graph.vs.find(name=str(m)).index for m in ring_members_set if str(m) in all_accounts]
+            if v_indices:
+                subgraph_edges = graph.es.select(_source_in=v_indices, _target_in=v_indices)
+                ring_val = sum(e["amount"] for e in subgraph_edges)
+        except Exception:
+            ring_val = 0 
+            
         formatted_rings.append({
             "ring_id": ring_id,
             "member_accounts": [str(m) for m in ring["members"]],
             "pattern_type": rtype,
-            "risk_score": ring_risk_score
+            "risk_score": ring_risk_score,
+            "total_value": round(ring_val, 2)
         })
         
         for member in ring["members"]:
@@ -100,49 +128,47 @@ async def analyze_transactions(file: UploadFile = File(...)):
             suspicious_accounts[member]["detected_patterns"].add(rtype)
             suspicious_accounts[member]["ring_ids"].add(ring_id)
 
-    # Finalize Suspicious Accounts
+    # Finalize Accounts
     final_accounts = []
     for acc in suspicious_accounts.values():
+        acc_id = acc["account_id"]
         acc["suspicion_score"] = min(100, acc["score"])
         acc["detected_patterns"] = list(acc["detected_patterns"])
-        # Join multiple rings with comma if any
         acc["ring_id"] = ",".join(list(acc["ring_ids"]))
         
-        # Remove internal keys
+        acc["total_inflow"] = round(inflow.get(acc_id, 0.0) if isinstance(acc_id, str) else inflow.get(int(acc_id), 0.0), 2)
+        acc["total_outflow"] = round(outflow.get(acc_id, 0.0) if isinstance(acc_id, str) else outflow.get(int(acc_id), 0.0), 2)
+        acc["net_balance"] = round(acc["total_inflow"] - acc["total_outflow"], 2)
+
         del acc["score"]
         del acc["ring_ids"]
-        
         final_accounts.append(acc)
     
-    # Sort accounts by score desc
     final_accounts.sort(key=lambda x: x["suspicion_score"], reverse=True)
     
-    # 5. Graph Data Visualization
+    # 5. Graph Data
     vis_nodes = []
     sus_map = {acc['account_id']: acc for acc in final_accounts}
     
     for v in graph.vs:
         name = v["name"]
         acc_data = sus_map.get(name)
-        
         is_suspicious = acc_data is not None
         score = acc_data["suspicion_score"] if is_suspicious else 0
         
-        # Node Color: Red > 50, Orange > 0, Grey otherwise
         color = "#cccccc"
-        if score > 50:
-            color = "#ef4444" # red-500
-        elif score > 0:
-            color = "#f97316" # orange-500
+        if score > 50: color = "#ef4444"
+        elif score > 0: color = "#f97316"
             
         vis_nodes.append({
             "id": name,
-            "val": 1 + (score / 20), # size
+            "val": 1 + (score / 20),
             "color": color,
             "suspicion_score": score,
-            # Add details for hover
             "patterns": acc_data["detected_patterns"] if is_suspicious else [],
-            "ring": acc_data["ring_id"] if is_suspicious else ""
+            "ring": acc_data["ring_id"] if is_suspicious else "",
+            "inflow": round(inflow.get(name, 0.0), 2),
+            "outflow": round(outflow.get(name, 0.0), 2)
         })
         
     vis_edges = []
@@ -151,7 +177,8 @@ async def analyze_transactions(file: UploadFile = File(...)):
         tgt = graph.vs[e.target]["name"]
         vis_edges.append({
             "source": src,
-            "target": tgt
+            "target": tgt,
+            "amount": e["amount"]
         })
 
     processing_time = time.time() - start_time
@@ -170,6 +197,62 @@ async def analyze_transactions(file: UploadFile = File(...)):
             "links": vis_edges 
         }
     }
+
+@app.post("/generate-sar")
+async def generate_sar(ring: Dict[str, Any] = Body(...)):
+    """
+    Generates a Suspicious Activity Report (SAR) using Groq based on ring data.
+    """
+    if not groq_client:
+        # Mock Response if no API key
+        time.sleep(2)
+        return {
+            "executive_summary": "Simulated AI Response: Groq API Key is missing. This is a placeholder summary indicating that a suspicious ring was detected with circular flow characteristics.",
+            "mule_herder": ring['member_accounts'][0] if ring.get('member_accounts') else "Unknown"
+        }
+
+    # Construct Prompt
+    prompt = f"""
+    You are an expert Financial Forensics Analyst for FinCEN.
+    Analyze the following Fraud Ring data and generate a professional Suspicious Activity Report (SAR) snippet.
+    
+    Ring ID: {ring.get('ring_id')}
+    Pattern Type: {ring.get('pattern_type')}
+    Risk Score: {ring.get('risk_score')}/100
+    Total Volume: ${ring.get('total_value', 0)}
+    Member Accounts: {', '.join(ring.get('member_accounts', []))}
+    
+    Output strictly in JSON format with two keys:
+    1. "executive_summary": A professional, 3-sentence summary of the suspicious activity, mentioning the typology (e.g. smurfing, cycle) and financial impact. Use "We have detected..." style.
+    2. "mule_herder": Identify the likely central actor (account ID) and briefly explain why (e.g. "Account X initiated the flow"). If unsure, pick the first account.
+    """
+
+    try:
+        completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a specialized financial crime detection AI. Output strictly valid JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model="llama3-8b-8192",
+            temperature=0.2,
+            max_tokens=300,
+            response_format={"type": "json_object"}
+        )
+        
+        response_content = completion.choices[0].message.content
+        import json
+        return json.loads(response_content)
+
+    except Exception as e:
+        print(f"Groq API Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

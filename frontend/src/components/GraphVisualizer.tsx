@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, DollarSign } from 'lucide-react';
 import clsx from 'clsx';
 
 interface GraphVisualizerProps {
@@ -16,13 +16,12 @@ const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisual
   const fgRef = useRef<any>();
   const [dimensions, setDimensions] = useState({ w: 800, h: 600 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showAmounts, setShowAmounts] = useState(false);
 
   // Filter Data based on Isolation
   const displayData = (() => {
       if (!isolatedRingId) return graphData;
       
-      // Filter logic: Only show nodes in the ring or connected to them? 
-      // User asked for "Isolated View" (only showing the currently selected threat ring).
       const relevantNodes = graphData.nodes.filter((n: any) => n.ring && n.ring.includes(isolatedRingId));
       const relevantNodeIds = new Set(relevantNodes.map((n: any) => n.id));
       
@@ -74,13 +73,24 @@ const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisual
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
         <div className="glass p-1.5 rounded-lg flex flex-col gap-1 border border-white/10">
             <button onClick={() => handleZoom(1.2)} className="p-2 hover:bg-white/10 rounded text-cyan-400 transition-colors" title="Zoom In">
-            <ZoomIn size={18} />
+              <ZoomIn size={18} />
             </button>
             <button onClick={() => handleZoom(0.8)} className="p-2 hover:bg-white/10 rounded text-cyan-400 transition-colors" title="Zoom Out">
-            <ZoomOut size={18} />
+              <ZoomOut size={18} />
             </button>
             <button onClick={handleFit} className="p-2 hover:bg-white/10 rounded text-cyan-400 transition-colors" title="Reset View">
-            <Maximize size={18} />
+              <Maximize size={18} />
+            </button>
+            <div className="w-full h-px bg-white/10 my-1"></div>
+            <button 
+                onClick={() => setShowAmounts(!showAmounts)} 
+                className={clsx(
+                    "p-2 rounded transition-colors",
+                    showAmounts ? "bg-green-500/20 text-green-400" : "hover:bg-white/10 text-slate-500"
+                )}
+                title="Toggle Edge Amounts"
+            >
+              <DollarSign size={18} />
             </button>
         </div>
       </div>
@@ -112,6 +122,34 @@ const GraphVisualizer = ({ graphData, isolatedRingId, onNodeClick }: GraphVisual
                onNodeClick(node);
                fgRef.current?.centerAt(node.x, node.y, 1000);
                fgRef.current?.zoom(4, 2000);
+            }}
+            // Custom drawing for edge labels if enabled
+            linkCanvasObjectMode={() => showAmounts ? 'after' : undefined}
+            linkCanvasObject={(link: any, ctx, globalScale) => {
+                if (!showAmounts || !link.amount) return;
+                
+                const label = `$${link.amount}`;
+                const fontSize = 10/globalScale; // Scale font based on zoom
+                ctx.font = `${fontSize}px Sans-Serif`;
+                const textWidth = ctx.measureText(label).width;
+                const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); // some padding
+
+                // Calculate midpoint
+                const x = link.source.x + (link.target.x - link.source.x) / 2;
+                const y = link.source.y + (link.target.y - link.source.y) / 2;
+
+                ctx.save();
+                ctx.translate(x, y);
+                // Rotate label to align with edge? No, keep it horizontal for readability
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(-bckgDimensions[0] / 2, -bckgDimensions[1] / 2, ...bckgDimensions);
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#4ade80'; // Green text
+                ctx.fillText(label, 0, 0);
+                ctx.restore();
             }}
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.3}

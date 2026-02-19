@@ -1,4 +1,4 @@
-import { X, ExternalLink, Flag, CheckCircle } from 'lucide-react';
+import { X, ExternalLink, Flag, CheckCircle, Wallet, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SidebarRightProps {
@@ -29,7 +29,7 @@ export function SidebarRight({ node, onClose }: SidebarRightProps) {
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-8 overflow-y-auto flex-1">
+          <div className="p-6 space-y-8 overflow-y-auto flex-1 custom-scrollbar">
              
              {/* Suspicion Score */}
              <div className="space-y-2">
@@ -43,6 +43,39 @@ export function SidebarRight({ node, onClose }: SidebarRightProps) {
                      className={`h-full rounded-full ${node.suspicion_score > 80 ? 'bg-red-500' : 'bg-orange-500'}`} 
                      style={{ width: `${node.suspicion_score}%` }}
                    ></div>
+                </div>
+             </div>
+
+             {/* Financial Stats */}
+             <div className="space-y-3 p-4 bg-slate-900/40 rounded-xl border border-white/5">
+                <h3 className="text-xs text-slate-500 uppercase font-bold tracking-widest flex items-center gap-2 mb-2">
+                   <Wallet size={12} /> Financial Activity
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <div className="text-[10px] text-slate-500 uppercase mb-1 flex items-center gap-1">
+                            <ArrowDownRight size={10} className="text-green-500" /> Inflow
+                        </div>
+                        <div className="text-sm font-mono text-green-400 font-bold">
+                            ${node.inflow?.toLocaleString() || '0'}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] text-slate-500 uppercase mb-1 flex items-center gap-1">
+                            <ArrowUpRight size={10} className="text-red-500" /> Outflow
+                        </div>
+                        <div className="text-sm font-mono text-red-400 font-bold">
+                            ${node.outflow?.toLocaleString() || '0'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="pt-3 border-t border-white/5 mt-2">
+                    <div className="text-[10px] text-slate-500 uppercase mb-1">Net Balance</div>
+                    <div className={`text-base font-mono font-bold ${node.inflow - node.outflow >= 0 ? 'text-white' : 'text-red-400'}`}>
+                         ${(node.inflow - node.outflow)?.toLocaleString() || '0'}
+                    </div>
                 </div>
              </div>
 
@@ -63,16 +96,6 @@ export function SidebarRight({ node, onClose }: SidebarRightProps) {
                    )}
                 </div>
              </div>
-
-             {/* Ring membership */}
-             {node.ring && (
-                 <div className="space-y-2">
-                    <div className="text-xs text-slate-500 uppercase font-bold tracking-widest">Ring Membership</div>
-                    <div className="bg-slate-800/30 p-3 rounded border border-white/5 font-mono text-xs text-cyan-400">
-                       {node.ring}
-                    </div>
-                 </div>
-             )}
 
              {/* Actions */}
              <div className="pt-6 border-t border-white/5 space-y-3">

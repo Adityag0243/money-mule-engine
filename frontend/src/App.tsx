@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Header } from './components/layout/Header';
 import { SidebarLeft } from './components/layout/SidebarLeft';
 import { SidebarRight } from './components/layout/SidebarRight';
+import { SARPanel } from './components/SARPanel';
 import GraphVisualizer from './components/GraphVisualizer';
 
 // Types (Keep existing)
@@ -47,6 +48,7 @@ function App() {
   // View State
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [sarRing, setSarRing] = useState<any | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -95,14 +97,16 @@ function App() {
   };
 
   const handleRingSelect = (id: string | null) => {
-    // Toggle: if clicking same ring, deselect.
     if (selectedRingId === id) {
         setSelectedRingId(null);
     } else {
         setSelectedRingId(id);
     }
-    // Also reset node selection on view change
     setSelectedNode(null);
+  };
+
+  const handleGenerateSAR = (ring: any) => {
+      setSarRing(ring);
   };
 
   // ----- MAIN RENDER -----
@@ -171,10 +175,10 @@ function App() {
       {/* 1. Header (Global KPIs) */}
       <Header 
          stats={{
-             totalTransactions: data.summary.total_accounts_analyzed, // Approx
+             totalTransactions: data.summary.total_accounts_analyzed,
              processingTime: data.summary.processing_time_seconds,
              fraudRings: data.summary.fraud_rings_detected,
-             illicitVolume: 0 // Not calculated yet
+             illicitVolume: 0 // Could sum up ring values if needed
          }}
          onExport={downloadJson}
       />
@@ -186,6 +190,7 @@ function App() {
              rings={data.fraud_rings} 
              selectedRingId={selectedRingId}
              onSelectRing={handleRingSelect}
+             onGenerateSAR={handleGenerateSAR}
           />
 
           {/* 3. Center Canvas (Graph) */}
@@ -201,6 +206,13 @@ function App() {
           <SidebarRight 
               node={selectedNode} 
               onClose={() => setSelectedNode(null)} 
+          />
+
+          {/* 5. SAR Panel (Overlay) */}
+          <SARPanel 
+             isOpen={!!sarRing}
+             onClose={() => setSarRing(null)}
+             ringData={sarRing}
           />
           
       </div>
