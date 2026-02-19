@@ -69,7 +69,7 @@ function App() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('http://localhost:8000/analyze', {
+      const res = await fetch('https://money-mule-backend.onrender.com/analyze', {
         method: 'POST',
         body: formData,
       });
