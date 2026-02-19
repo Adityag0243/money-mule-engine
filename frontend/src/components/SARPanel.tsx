@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, FileText, Download, X, Send, ShieldAlert, Sparkles, AlertTriangle, Fingerprint } from 'lucide-react';
+import { X, Send, Sparkles, Fingerprint } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { ToastType } from './ui/Toast';
 
@@ -61,7 +61,7 @@ export function SARPanel({ isOpen, onClose, ringData, showToast }: SARPanelProps
               throw new Error("Submission failed");
           }
       } catch (err) {
-          showToast("Failed to submit SAR.", 'error');
+          showToast("Failed to submit SAR.", err);
           setLoading(false);
       }
   };
