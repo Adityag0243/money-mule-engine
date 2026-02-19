@@ -144,7 +144,7 @@ const GraphVisualizer = memo(({ graphData, isolatedRingId, onNodeClick }: GraphV
                 // Rotate label to align with edge? No, keep it horizontal for readability
                 
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                ctx.fillRect(-bckgDimensions[0] / 2, -bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
+                ctx.fillRect(-bckgDimensions[0] / 2, -bckgDimensions[1] / 2, ...bckgDimensions);
 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';

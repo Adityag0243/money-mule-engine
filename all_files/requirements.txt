@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pandas
+python-igraph
+pydantic
+python-multipart
+groq
+python-dotenv
