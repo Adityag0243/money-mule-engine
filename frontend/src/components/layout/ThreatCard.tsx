@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { Bot, DollarSign, Activity, AlertCircle } from 'lucide-react';
+import { Bot, DollarSign, Activity } from 'lucide-react';
 import { memo } from 'react';
 
 interface ThreatCardProps {
