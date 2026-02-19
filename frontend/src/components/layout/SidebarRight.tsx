@@ -1,4 +1,4 @@
-import { X, ExternalLink, Flag, CheckCircle, Wallet, ArrowRight, Shield } from 'lucide-react';
+import { X, ExternalLink, Flag, CheckCircle, Wallet, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ToastType } from '../ui/Toast';
 
