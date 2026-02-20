@@ -1,6 +1,25 @@
 import igraph
 from typing import List, Set, Dict
 
+
+import numpy as np
+
+# will use this capacity thing for complexity and Time complexity reduction
+def get_dynamic_outdegree_cap(graph: igraph.Graph, multiplier: float = 3.0) -> int:
+    """
+    Derives a statistically grounded out-degree cap from the graph itself.
+    Cap = mean + (multiplier * std_dev) — classic outlier detection
+    """
+    outdegrees = graph.outdegree()  # list of all out-degrees
+    
+    mean = np.mean(outdegrees)
+    std  = np.std(outdegrees)
+    
+    cap = mean + (multiplier * std)
+    return int(cap)
+
+
+
 def find_cycles_dfs(graph: igraph.Graph, min_len: int = 3, max_len: int = 5) -> List[Dict]:
     """
     Detects circular money flows (cycles) of length 3 to 5 using DFS.
@@ -9,9 +28,11 @@ def find_cycles_dfs(graph: igraph.Graph, min_len: int = 3, max_len: int = 5) -> 
     cycles = []
     # Use a set of sorted tuples to avoid duplicate cycles (e.g., A-B-C vs B-C-A)
     seen_cycles = set()
-    
-    # We only care about nodes that have both in and out degrees > 0
-    candidates = [v.index for v in graph.vs if v.degree(mode="in") > 0 and v.degree(mode="out") > 0]
+
+    cap = get_dynamic_outdegree_cap(graph)
+    # We only care about nodes that have both in > 0 and out degrees <= cap
+    # it will reduce outlier things
+    candidates = [v.index for v in graph.vs if v.degree(mode="in") > 0 and v.degree(mode="out") <= cap]
     
     for start_node_idx in candidates:
         stack = [(start_node_idx, [start_node_idx])] # (current_node, path)
