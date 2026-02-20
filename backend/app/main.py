@@ -22,7 +22,8 @@ app = FastAPI(title="Money Mule Detection Engine")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://money-muling-system.vercel.app",
         "https://money-mule-engine.vercel.app",
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
@@ -56,6 +57,10 @@ class SARSubmission(BaseModel):
     ring_id: str
     report_content: Dict[str, Any]
     analyst_notes: Optional[str] = None
+
+@app.get("/")
+def root():
+    return {"message": "Money Mule Engine API running"}
 
 @app.post("/analyze")
 async def analyze_transactions(file: UploadFile = File(...)):
