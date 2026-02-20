@@ -14,21 +14,23 @@ def get_dynamic_outdegree_cap(graph: igraph.Graph, multiplier: float = 3.0) -> i
     outdegrees = graph.outdegree()
     mean = np.mean(outdegrees)
     std  = np.std(outdegrees)
-    cap  = int(mean + (multiplier * std))
-    return cap
+    return int(mean + (multiplier * std))
 
 
 def find_cycles_dfs(graph: igraph.Graph, min_len: int = 3, max_len: int = 5) -> List[Dict]:
     """
-    Detects circular money flows (cycles) of length 3 to 5 using DFS with backtracking.
+    Detects circular money flows (cycles) of length 3 to 5 using iterative DFS.
     Returns a list of rings, where each ring is a dict with type, members, and metadata.
 
     Approach:
-      - Pre-builds adjacency dict once to avoid repeated igraph API calls during traversal
-      - Uses a single shared path list with backtracking instead of copying path on every step
-      - Maintains a path_set alongside the path for O(1) membership checks
-      - Applies a dynamic out-degree cap (mean + 3*std) to exclude statistical outlier nodes
-        such as banks and payment gateways which are not mule candidates
+      - Iterative DFS with explicit stack — eliminates Python function call overhead
+        that recursive DFS accumulates (millions of stack frames at scale)
+      - Each stack frame stores (node, iterator over neighbors) so we resume
+        exactly where we left off after exploring a subtree, enabling true backtracking
+        without recursion
+      - Single shared path list + path_set mutated in place — zero list copying
+      - Dynamic out-degree cap (mean + 3*std) excludes statistical outlier nodes
+      - O(1) cycle membership check via path_set
       - Deduplicates cycles via canonical rotation (smallest index first)
     """
     cycles      = []
@@ -36,61 +38,66 @@ def find_cycles_dfs(graph: igraph.Graph, min_len: int = 3, max_len: int = 5) -> 
 
     cap = get_dynamic_outdegree_cap(graph)
 
-    # Pre-build adjacency list once — avoids graph.successors() call on every DFS step
+    # Pre-build adjacency dict once — avoids repeated igraph API calls in hot loop
     adj = {}
     for v in graph.vs:
-        idx     = v.index
-        out_deg = graph.outdegree(idx)
-        # High out-degree nodes are still visitable during traversal,
-        # but are excluded as start nodes via candidates filter below
-        adj[idx] = graph.successors(idx) if out_deg <= cap else []
+        idx = v.index
+        adj[idx] = graph.successors(idx) if graph.outdegree(idx) <= cap else []
 
-    # Only start DFS from nodes with in-degree > 0 and out-degree within cap
     candidates = [
         v.index for v in graph.vs
         if v.degree(mode="in") > 0 and 0 < v.degree(mode="out") <= cap
     ]
 
-    # Single shared path + set — mutated in place, no list copying during DFS
-    path     = []
+    path     = []   # current DFS path, mutated in place
     path_set = set()
 
-    def dfs(node: int, start: int):
-        path.append(node)
-        path_set.add(node)
+    for start in candidates:
+        if not adj[start]:
+            continue
 
-        if len(path) <= max_len:
-            for neighbor in adj[node]:
+        # Each frame: (node, iterator_over_its_neighbors)
+        # Using iterator means we resume from where we left off — true backtracking
+        path.append(start)
+        path_set.add(start)
+        stack = [(start, iter(adj[start]))]
+
+        while stack:
+            node, neighbors_iter = stack[-1]
+
+            try:
+                neighbor = next(neighbors_iter)
 
                 if neighbor == start:
-                    # Cycle detected — validate length
+                    # --- Cycle found ---
                     if min_len <= len(path) <= max_len:
                         cycle_indices = tuple(path)
-                        # Canonicalize by rotating so smallest index is first
                         min_pos   = cycle_indices.index(min(cycle_indices))
                         canonical = cycle_indices[min_pos:] + cycle_indices[:min_pos]
 
                         if canonical not in seen_cycles:
                             seen_cycles.add(canonical)
-                            cycle_names = [graph.vs[i]["name"] for i in cycle_indices]
                             cycles.append({
                                 "type"    : "Cycle",
-                                "members" : cycle_names,
+                                "members" : [graph.vs[i]["name"] for i in cycle_indices],
                                 "metadata": {"length": len(path)}
                             })
 
-                elif neighbor not in path_set:   # O(1) set lookup vs O(n) list scan
-                    if len(path) < max_len:
-                        dfs(neighbor, start)
+                elif neighbor not in path_set and len(path) < max_len:
+                    # Go deeper
+                    path.append(neighbor)
+                    path_set.add(neighbor)
+                    stack.append((neighbor, iter(adj[neighbor])))
 
-        # Backtrack — undo in O(1), zero list copying
-        path.pop()
-        path_set.discard(node)
+            except StopIteration:
+                # All neighbors of current node exhausted — backtrack
+                stack.pop()
+                path.pop()
+                path_set.discard(node)
 
-    for start_node in candidates:
-        if not adj[start_node]:
-            continue
-        dfs(start_node, start_node)
+        # Clean up for next start node
+        path.clear()
+        path_set.clear()
 
     return cycles
 
@@ -98,7 +105,7 @@ def find_cycles_dfs(graph: igraph.Graph, min_len: int = 3, max_len: int = 5) -> 
 def detect_shells(graph: igraph.Graph, min_hops: int = 3) -> List[Dict]:
     """
     Detects layered shell networks.
-    Identifies chains of 3+ hops where intermediate nodes have low total degree (2–3),
+    Identifies chains of 3+ hops where intermediate nodes have low total degree (2-3),
     characteristic of shell accounts designed as thin pass-throughs (1 in, 1 out).
 
     Approach:
