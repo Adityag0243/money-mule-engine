@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Dict
 
 
-def get_dynamic_outdegree_cap(graph: igraph.Graph, multiplier: float = 3.0) -> int:
+def get_dynamic_outdegree_cap(graph: igraph.Graph, multiplier: float = 2.0) -> int:
     """
     Derives a statistically grounded out-degree cap from the graph itself.
     Cap = mean + (multiplier * std_dev) — classic outlier detection.
@@ -29,7 +29,7 @@ def find_cycles_dfs(graph: igraph.Graph, min_len: int = 3, max_len: int = 5) -> 
         exactly where we left off after exploring a subtree, enabling true backtracking
         without recursion
       - Single shared path list + path_set mutated in place — zero list copying
-      - Dynamic out-degree cap (mean + 3*std) excludes statistical outlier nodes
+      - Dynamic out-degree cap (mean + 2*std) excludes statistical outlier nodes
       - O(1) cycle membership check via path_set
       - Deduplicates cycles via canonical rotation (smallest index first)
     """
