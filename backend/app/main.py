@@ -157,7 +157,7 @@ async def analyze_transactions(file: UploadFile = File(...)):
         # ID Generation & Deduplication
         members_str = ",".join(sorted_members)
         ring_hash = abs(hash(members_str + rtype)) % 100000
-        ring_id = f"RING-{ring_hash:05d}"
+        ring_id = f"RING_{ring_hash:05d}"
         
         if ring_id in seen_ring_ids:
             continue
