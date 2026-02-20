@@ -204,7 +204,7 @@ async def analyze_transactions(file: UploadFile = File(...)):
             "account_id": acc_id,
             "suspicion_score": round(final_score, 1),
             "detected_patterns": list(data["patterns"]),
-            "ring_id": ",".join(list(data["rings"]))
+            "ring_id": list(data["rings"])[0] if data["rings"] else None
         }
         
         acc["total_inflow"] = round(inflow.get(acc_id, 0.0) if isinstance(acc_id, str) else inflow.get(int(acc_id), 0.0), 2)
